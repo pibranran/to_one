@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>归一</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="icon" href="ico.png">
+    <style>
+        .r-corner { border-radius: 12px; }
+        .tile { 
+            transition: all 150ms ease-in-out;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            display: flex; align-items: center; justify-content: center;
+            width: 100%; height: 100%;
+        }
+        .grid-cell-empty { background-color: #f3f4f6; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02); }
+        
+        /* 响应式占位，确保无论是否有数字，格子都是正方形 */
+        .cell-base { width: 100%; position: relative; }
+        .cell-base::after { content: ""; display: block; padding-bottom: 100%; }
+        .cell-content { position: absolute; top: 0; left: 0; right: 0; bottom: 0; }
+
+        /* 禁止移动端滚动和缩放带来的干扰 */
+        body { 
+            -webkit-tap-highlight-color: transparent; 
+            touch-action: none; 
+            overflow: hidden; 
+            overscroll-behavior: none;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 flex items-center justify-center min-h-screen text-slate-800 p-4 font-sans">
+
+    <div class="bg-white p-6 md:p-8 r-corner shadow-2xl border border-gray-100 w-full max-w-[400px]">
+        <div class="flex justify-between items-start mb-6">
+            <div>
+                <h1 class="text-3xl font-black tracking-tighter text-slate-900 leading-none">归一</h1>
+                <p class="text-[9px] text-slate-400 uppercase tracking-[0.2em] mt-2">目标：合成数字 1</p>
+            </div>
+            <div class="bg-slate-900 px-4 py-2 r-corner text-white min-w-[80px] text-center shadow-lg">
+                <span class="block text-[10px] opacity-60 font-medium leading-none mb-1">得分</span>
+                <span id="score" class="text-lg font-mono font-bold">0</span>
+            </div>
+        </div>
+
+        <div class="flex gap-2 mb-4">
+            <button onclick="showMathQuiz('easy')" class="flex-1 bg-blue-50 text-blue-700 py-2 r-corner text-[10px] font-bold tracking-wider hover:bg-blue-100 transition border border-blue-100 shadow-sm">
+                ⚡ 概率补给 (口算)
+            </button>
+            <button onclick="showMathQuiz('hard')" class="flex-1 bg-slate-900 text-white py-2 r-corner text-[10px] font-bold tracking-wider hover:bg-slate-800 transition shadow-md">
+                🌀 逻辑坍缩 (代数)
+            </button>
+        </div>
+
+        <div id="game-board" class="grid grid-cols-4 gap-3 bg-slate-200 p-3 r-corner relative aspect-square">
+            </div>
+
+        <div class="mt-6 flex items-center justify-between">
+            <button onclick="initGame()" class="border-2 border-slate-900 text-slate-900 px-5 py-2 r-corner font-bold hover:bg-slate-900 hover:text-white transition-colors text-xs">
+                重新开始
+            </button>
+            <p class="text-[10px] text-slate-400 font-medium">滑动屏幕或使用方向键</p>
+        </div>
+    </div>
+
+    <div id="quiz-overlay" class="hidden fixed inset-0 bg-slate-900/90 backdrop-blur-md flex items-center justify-center z-[60]">
+        <div class="bg-white p-8 r-corner shadow-2xl w-[300px] text-center">
+            <div id="quiz-tag" class="text-[10px] font-bold text-blue-600 uppercase mb-2">数学干预</div>
+            <h2 id="quiz-question" class="text-2xl font-mono mb-6 text-slate-800"></h2>
+            <input type="number" id="quiz-input" class="w-full border-2 border-slate-200 p-3 r-corner mb-4 text-center text-xl focus:border-blue-500 outline-none" placeholder="答案">
+            <button onclick="checkQuizAnswer()" class="w-full bg-blue-600 text-white py-3 r-corner font-bold shadow-lg active:scale-95 transition">提交计算结果</button>
+            <button onclick="closeQuiz()" class="mt-4 text-slate-400 text-xs underline cursor-pointer">放弃干预</button>
+        </div>
+    </div>
+
+    <div id="overlay" class="hidden fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-50">
+        <div class="bg-white p-8 r-corner text-center shadow-2xl m-6">
+            <h2 id="status-title" class="text-3xl font-bold mb-4 text-blue-600">成功!</h2>
+            <p id="status-desc" class="text-slate-500 mb-6">你成功合成了数字 1。</p>
+            <button onclick="initGame()" class="bg-slate-900 text-white px-8 py-3 r-corner font-bold shadow-lg">重整旗鼓</button>
+        </div>
+    </div>
+
+    <script>
+        let grid = [];
+        let score = 0;
+        let nextTileForce = null;
+        let currentQuiz = { answer: 0, type: '' };
+        const boardElement = document.getElementById('game-board');
+
+        // 初始化游戏
+        function initGame() {
+            grid = Array(4).fill().map(() => Array(4).fill(0));
+            score = 0;
+            nextTileForce = null;
+            document.getElementById('overlay').classList.add('hidden');
+            addTile(); addTile(); addTile();
+            render();
+        }
+
+        // 添加方块
+        function addTile() {
+            let emptyCells = [];
+            for(let r=0; r<4; r++) 
+                for(let c=0; c<4; c++) 
+                    if(grid[r][c] === 0) emptyCells.push({r, c});
+            
+            if(emptyCells.length > 0) {
+                let {r, c} = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+                // 检查是否有 Buff 强制生成的数字
+                grid[r][c] = nextTileForce || (Math.random() < 0.9 ? 4096 : 2048);
+                nextTileForce = null;
+            }
+        }
+
+        // 渲染页面
+        function render() {
+            boardElement.innerHTML = '';
+            for (let r = 0; r < 4; r++) {
+                for (let c = 0; c < 4; c++) {
+                    const val = grid[r][c];
+                    const container = document.createElement('div');
+                    container.className = 'cell-base';
+                    const content = document.createElement('div');
+                    content.className = 'cell-content r-corner ' + (val > 0 ? 'bg-white tile' : 'grid-cell-empty');
+                    if(val > 0) {
+                        content.textContent = val;
+                        if(val === 1) content.classList.add('bg-blue-600', 'text-white', 'scale-110', 'shadow-blue-200');
+                        // 数字长度适配
+                        content.style.fontSize = val > 999 ? '0.8rem' : '1.2rem';
+                        content.style.fontWeight = 'bold';
+                    }
+                    container.appendChild(content);
+                    boardElement.appendChild(container);
+                }
+            }
+            document.getElementById('score').textContent = score;
+        }
+
+        // 核心滑动合并逻辑
+        function slide(row) {
+            let arr = row.filter(v => v !== 0);
+            for (let i = 0; i < arr.length - 1; i++) {
+                if (arr[i] === arr[i + 1]) {
+                    arr[i] /= 2; // 合并减半
+                    score += 10;
+                    arr[i + 1] = 0;
+                    if(arr[i] === 1) endGame(true);
+                }
+            }
+            arr = arr.filter(v => v !== 0);
+            while (arr.length < 4) arr.push(0);
+            return arr;
+        }
+
+        function rotateGrid(m) { return m[0].map((_, i) => m.map(row => row[i]).reverse()); }
+
+        function handleMove(dir) {
+            if(!document.getElementById('overlay').classList.contains('hidden')) return;
+            let temp = JSON.parse(JSON.stringify(grid));
+            let rots = { 'left': 0, 'down': 1, 'right': 2, 'up': 3 }[dir];
+            for(let i=0; i<rots; i++) temp = rotateGrid(temp);
+            for(let i=0; i<4; i++) temp[i] = slide(temp[i]);
+            for(let i=0; i<(4-rots)%4; i++) temp = rotateGrid(temp);
+            
+            if (JSON.stringify(grid) !== JSON.stringify(temp)) {
+                grid = temp; 
+                addTile(); 
+                render();
+                if (checkGameOver()) endGame(false);
+            }
+        }
+
+        function checkGameOver() {
+            for (let r = 0; r < 4; r++) 
+                for (let c = 0; c < 4; c++) {
+                    if (grid[r][c] === 0) return false;
+                    if (c < 3 && grid[r][c] === grid[r][c+1]) return false;
+                    if (r < 3 && grid[r][c] === grid[r+1][c]) return false;
+                }
+            return true;
+        }
+
+        function endGame(win) {
+            const over = document.getElementById('overlay');
+            over.classList.remove('hidden');
+            document.getElementById('status-title').textContent = win ? "成功突破!" : "计算溢出!";
+            document.getElementById('status-title').className = "text-3xl font-bold mb-4 " + (win ? "text-blue-600" : "text-red-500");
+            document.getElementById('status-desc').textContent = win ? "你成功合成了数字 1。" : "棋盘已满，逻辑链路断开。";
+        }
+
+        // --- 数学补给系统 ---
+        function showMathQuiz(type) {
+            currentQuiz.type = type;
+            const q = document.getElementById('quiz-question');
+            const input = document.getElementById('quiz-input');
+            
+            // 修复点：清空上次输入的文本
+            input.value = '';
+
+            if(type === 'easy') {
+                let a = Math.floor(Math.random()*9)+2, b = Math.floor(Math.random()*9)+2;
+                q.innerHTML = `${a} &times; ${b} = ?`;
+                currentQuiz.answer = a*b;
+                document.getElementById('quiz-tag').innerText = "补给：下一球必为 2048";
+            } else {
+                let x = Math.floor(Math.random()*4)+1, y = Math.floor(Math.random()*4)+1;
+                q.innerHTML = `若 x=${x}, y=${y} <br>x² + y² = ?`;
+                currentQuiz.answer = x*x + y*y;
+                document.getElementById('quiz-tag').innerText = "坍缩：随机消灭一个 4096";
+            }
+            document.getElementById('quiz-overlay').classList.remove('hidden');
+            setTimeout(() => input.focus(), 100);
+        }
+
+        function checkQuizAnswer() {
+            const userInput = document.getElementById('quiz-input').value;
+            if(parseInt(userInput) === currentQuiz.answer) {
+                if(currentQuiz.type === 'easy') {
+                    nextTileForce = 2048; 
+                    alert("干预成功：下一个出现的方块必为 2048！");
+                } else {
+                    let done = false;
+                    for(let r=0; r<4; r++) for(let c=0; c<4; c++) 
+                        if(grid[r][c] === 4096) { grid[r][c] = 0; done = true; break; }
+                    alert(done ? "干预成功：检测到最大数值已被抹除！" : "干预无效：场上没有 4096");
+                    render();
+                }
+            } else { alert("计算偏差，干预失败！"); }
+            closeQuiz();
+        }
+        function closeQuiz() { document.getElementById('quiz-overlay').classList.add('hidden'); }
+
+        // --- 触屏与键盘控制 ---
+        let tsX, tsY;
+        window.addEventListener('touchstart', e => { 
+            tsX = e.touches[0].clientX; 
+            tsY = e.touches[0].clientY; 
+        }, { passive: true });
+
+        window.addEventListener('touchend', e => {
+            let dx = e.changedTouches[0].clientX - tsX;
+            let dy = e.changedTouches[0].clientY - tsY;
+            if(Math.max(Math.abs(dx), Math.abs(dy)) < 30) return;
+            if(Math.abs(dx) > Math.abs(dy)) handleMove(dx > 0 ? 'right' : 'left');
+            else handleMove(dy > 0 ? 'down' : 'up');
+        }, { passive: true });
+
+        window.addEventListener('keydown', e => {
+            if(e.key.includes('Arrow')) handleMove(e.key.replace('Arrow','').toLowerCase());
+        });
+
+        initGame();
+    </script>
+</body>
+</html>
