@@ -1,257 +1,669 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>归一</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="icon" href="ico.png">
-    <style>
-        .r-corner { border-radius: 12px; }
-        .tile { 
-            transition: all 150ms ease-in-out;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            display: flex; align-items: center; justify-content: center;
-            width: 100%; height: 100%;
-        }
-        .grid-cell-empty { background-color: #f3f4f6; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02); }
-        
-        /* 响应式占位，确保无论是否有数字，格子都是正方形 */
-        .cell-base { width: 100%; position: relative; }
-        .cell-base::after { content: ""; display: block; padding-bottom: 100%; }
-        .cell-content { position: absolute; top: 0; left: 0; right: 0; bottom: 0; }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>推格斗数 · 双人数学策略</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      user-select: none;
+    }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: linear-gradient(145deg, #1a2a1f 0%, #0f1b2d 100%);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-family: 'Segoe UI', 'Roboto', system-ui, sans-serif;
+      padding: 12px;
+    }
+    .game-container {
+      max-width: 700px;
+      width: 100%;
+      background: rgba(22, 34, 48, 0.85);
+      backdrop-filter: blur(8px);
+      border-radius: 48px;
+      padding: 24px 20px 30px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(255, 215, 150, 0.2);
+      border: 1px solid #5f7f6b;
+    }
+    h1 {
+      margin: 0 0 8px 0;
+      font-weight: 500;
+      text-align: center;
+      color: #efe6d7;
+      text-shadow: 0 4px 8px #00000040;
+      letter-spacing: 6px;
+      font-size: 2.1rem;
+    }
+    .subtitle {
+      text-align: center;
+      color: #b9c9b0;
+      margin-bottom: 16px;
+      font-style: italic;
+      border-bottom: 1px dashed #5f7f6b;
+      padding-bottom: 8px;
+    }
+    .board-wrapper {
+      position: relative;
+      margin: 10px 0;
+    }
+    .player-indicator {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      padding: 0 8px;
+    }
+    .player-badge {
+      padding: 8px 18px;
+      border-radius: 40px;
+      font-weight: bold;
+      font-size: 1.3rem;
+      box-shadow: 0 4px 0 #0f1a0f;
+      transition: all 0.2s;
+      border: 1px solid;
+    }
+    .red-badge {
+      background: #b84a4a;
+      color: #ffdab9;
+      border-color: #ffb08e;
+      box-shadow: 0 4px 0 #632c2c;
+    }
+    .blue-badge {
+      background: #3a6ea5;
+      color: #d4ecff;
+      border-color: #aad0ff;
+      box-shadow: 0 4px 0 #1d3b55;
+    }
+    .turn-active {
+      transform: scale(1.02);
+      box-shadow: 0 0 18px #f9e076, 0 4px 0 #3f2e1a;
+      border-color: #ffd966;
+    }
+    .phase-info {
+      background: #1e2c24;
+      padding: 6px 18px;
+      border-radius: 30px;
+      color: #e3dcc0;
+      font-weight: 600;
+      font-size: 1.1rem;
+      border: 1px solid #7f9a7b;
+    }
+    .grid-container {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 10px;
+      background: #2a3a2c;
+      padding: 18px 12px;
+      border-radius: 36px;
+      box-shadow: inset 0 6px 8px #0e140e, 0 10px 12px #0000004d;
+      border: 1px solid #7e9a74;
+      margin-bottom: 12px;
+    }
+    .cell {
+      aspect-ratio: 1 / 1;
+      background: #263b2b;
+      border-radius: 18px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      box-shadow: inset 0 -4px 0 #102010, 0 4px 6px #00000055;
+      border: 2px solid #56734e;
+      color: #f3efdd;
+      transition: 0.1s ease;
+      position: relative;
+      cursor: pointer;
+    }
+    .cell.red {
+      background: #ac4e4e;
+      border-color: #f3ae8e;
+      box-shadow: inset 0 -4px 0 #632a2a, 0 4px 6px #00000077;
+      color: #fff3e2;
+    }
+    .cell.blue {
+      background: #3f74a3;
+      border-color: #aac9f0;
+      box-shadow: inset 0 -4px 0 #1f3f5c, 0 4px 6px #00000077;
+      color: #e9f2ff;
+    }
+    .cell.selected {
+      outline: 4px solid #f5e57a;
+      outline-offset: 2px;
+      transform: scale(0.98);
+      border-color: #ffd966;
+    }
+    .value-large {
+      font-size: 2.2rem;
+      line-height: 1;
+      font-weight: 800;
+      text-shadow: 2px 2px 0 #00000050;
+    }
+    .level-indicator {
+      font-size: 1rem;
+      background: #1e2a1cbb;
+      padding: 2px 8px;
+      border-radius: 30px;
+      margin-top: 2px;
+      backdrop-filter: blur(2px);
+      font-weight: 600;
+      color: #fbeec9;
+      border: 1px solid #cfb27a;
+    }
+    .cell.high-tower {
+      border: 3px solid #f3c26b;
+      box-shadow: 0 0 12px #fbbc04, inset 0 -4px 0 #7a5c1a;
+    }
+    .cell.legendary {
+      border: 4px solid #ffd966;
+      box-shadow: 0 0 20px #ffbe3f, inset 0 -4px 0 #b57c00;
+      animation: pulse-glow 1.2s infinite alternate;
+    }
+    @keyframes pulse-glow {
+      from { box-shadow: 0 0 8px #ffd966, inset 0 -4px 0 #a57100; }
+      to { box-shadow: 0 0 20px #ffb82e, inset 0 -4px 0 #ffcd7e; }
+    }
 
-        /* 禁止移动端滚动和缩放带来的干扰 */
-        body { 
-            -webkit-tap-highlight-color: transparent; 
-            touch-action: none; 
-            overflow: hidden; 
-            overscroll-behavior: none;
-        }
-    </style>
+    .action-panel {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      margin: 18px 0 8px;
+    }
+    .direction-group {
+      display: flex;
+      gap: 10px;
+      background: #1e2a24c9;
+      padding: 8px 16px;
+      border-radius: 48px;
+      backdrop-filter: blur(4px);
+      border: 1px solid #7e9e74;
+    }
+    .btn {
+      background: #324f3e;
+      border: none;
+      border-bottom: 4px solid #142014;
+      color: #f3efdd;
+      font-weight: bold;
+      font-size: 1.2rem;
+      padding: 10px 20px;
+      min-width: 70px;
+      border-radius: 48px;
+      cursor: pointer;
+      box-shadow: 0 4px 6px #00000040;
+      transition: all 0.1s;
+      border: 1px solid #7fa074;
+    }
+    .btn.small {
+      font-size: 1rem;
+      padding: 8px 16px;
+      min-width: 60px;
+    }
+    .btn:active {
+      transform: translateY(3px);
+      border-bottom-width: 2px;
+    }
+    .btn:disabled {
+      opacity: 0.4;
+      transform: none;
+      pointer-events: none;
+      filter: grayscale(0.5);
+    }
+    .buff-section {
+      display: flex;
+      gap: 8px;
+    }
+    .buff-btn {
+      background: #7a5d3c;
+      border-bottom-color: #4d341f;
+      border-color: #c9aa7b;
+    }
+    .reset-btn {
+      background: #4d5f6b;
+    }
+    .status-message {
+      min-height: 32px;
+      color: #efdbaf;
+      font-weight: 500;
+      text-align: center;
+      margin: 12px 0 0;
+      font-size: 1.1rem;
+    }
+    .footer-note {
+      color: #7f9a7b;
+      text-align: center;
+      margin-top: 8px;
+      font-size: 0.9rem;
+    }
+  </style>
 </head>
-<body class="bg-gray-50 flex items-center justify-center min-h-screen text-slate-800 p-4 font-sans">
+<body>
+<div class="game-container">
+  <h1>⚔️ 推格斗数 ⚔️</h1>
+  <div class="subtitle">· 逢十进一 · 四连高塔 ·</div>
 
-    <div class="bg-white p-6 md:p-8 r-corner shadow-2xl border border-gray-100 w-full max-w-[400px]">
-        <div class="flex justify-between items-start mb-6">
-            <div>
-                <h1 class="text-3xl font-black tracking-tighter text-slate-900 leading-none">归一</h1>
-                <p class="text-[9px] text-slate-400 uppercase tracking-[0.2em] mt-2">目标：合成数字 1</p>
-            </div>
-            <div class="bg-slate-900 px-4 py-2 r-corner text-white min-w-[80px] text-center shadow-lg">
-                <span class="block text-[10px] opacity-60 font-medium leading-none mb-1">得分</span>
-                <span id="score" class="text-lg font-mono font-bold">0</span>
-            </div>
-        </div>
+  <div class="player-indicator">
+    <div class="player-badge blue-badge" id="blueBadge">🔵 蓝方</div>
+    <div class="phase-info" id="phaseDisplay">落子阶段</div>
+    <div class="player-badge red-badge" id="redBadge">🔴 红方</div>
+  </div>
 
-        <div class="flex gap-2 mb-4">
-            <button onclick="showMathQuiz('easy')" class="flex-1 bg-blue-50 text-blue-700 py-2 r-corner text-[10px] font-bold tracking-wider hover:bg-blue-100 transition border border-blue-100 shadow-sm">
-                ⚡ 概率补给 (口算)
-            </button>
-            <button onclick="showMathQuiz('hard')" class="flex-1 bg-slate-900 text-white py-2 r-corner text-[10px] font-bold tracking-wider hover:bg-slate-800 transition shadow-md">
-                🌀 逻辑坍缩 (代数)
-            </button>
-        </div>
+  <div class="board-wrapper">
+    <div class="grid-container" id="board"></div>
+  </div>
 
-        <div id="game-board" class="grid grid-cols-4 gap-3 bg-slate-200 p-3 r-corner relative aspect-square">
-            </div>
-
-        <div class="mt-6 flex items-center justify-between">
-            <button onclick="initGame()" class="border-2 border-slate-900 text-slate-900 px-5 py-2 r-corner font-bold hover:bg-slate-900 hover:text-white transition-colors text-xs">
-                重新开始
-            </button>
-            <p class="text-[10px] text-slate-400 font-medium">滑动屏幕或使用方向键</p>
-        </div>
+  <div class="action-panel">
+    <div class="direction-group" id="directionPanel">
+      <button class="btn small" id="pushForward">⬆️ 前</button>
+      <button class="btn small" id="pushLeft">⬅️ 左</button>
+      <button class="btn small" id="pushRight">➡️ 右</button>
     </div>
-
-    <div id="quiz-overlay" class="hidden fixed inset-0 bg-slate-900/90 backdrop-blur-md flex items-center justify-center z-[60]">
-        <div class="bg-white p-8 r-corner shadow-2xl w-[300px] text-center">
-            <div id="quiz-tag" class="text-[10px] font-bold text-blue-600 uppercase mb-2">数学干预</div>
-            <h2 id="quiz-question" class="text-2xl font-mono mb-6 text-slate-800"></h2>
-            <input type="number" id="quiz-input" class="w-full border-2 border-slate-200 p-3 r-corner mb-4 text-center text-xl focus:border-blue-500 outline-none" placeholder="答案">
-            <button onclick="checkQuizAnswer()" class="w-full bg-blue-600 text-white py-3 r-corner font-bold shadow-lg active:scale-95 transition">提交计算结果</button>
-            <button onclick="closeQuiz()" class="mt-4 text-slate-400 text-xs underline cursor-pointer">放弃干预</button>
-        </div>
+    <div class="buff-section">
+      <button class="btn buff-btn small" id="buffUpgrade">✨ 升格+1</button>
+      <button class="btn buff-btn small" id="buffDelete">💥 删除敌格</button>
     </div>
+    <button class="btn reset-btn small" id="resetGame">🔄 重开</button>
+  </div>
+  
+  <div id="statusMsg" class="status-message">🔴 红方先落子 (己方半场)</div>
+  <div class="footer-note">← 点击己方格选中 · 答题启用buff · 层数≥5金边 ≥10胜利 →</div>
+</div>
 
-    <div id="overlay" class="hidden fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-50">
-        <div class="bg-white p-8 r-corner text-center shadow-2xl m-6">
-            <h2 id="status-title" class="text-3xl font-bold mb-4 text-blue-600">成功!</h2>
-            <p id="status-desc" class="text-slate-500 mb-6">你成功合成了数字 1。</p>
-            <button onclick="initGame()" class="bg-slate-900 text-white px-8 py-3 r-corner font-bold shadow-lg">重整旗鼓</button>
-        </div>
-    </div>
+<script>
+  (function(){
+    "use strict";
 
-    <script>
-        let grid = [];
-        let score = 0;
-        let nextTileForce = null;
-        let currentQuiz = { answer: 0, type: '' };
-        const boardElement = document.getElementById('game-board');
+    const BOARD_SIZE = 6;
+    const WIN_LEVEL = 10;
+    const TOWER_LEVEL = 5;
 
-        // 初始化游戏
-        function initGame() {
-            grid = Array(4).fill().map(() => Array(4).fill(0));
-            score = 0;
-            nextTileForce = null;
-            document.getElementById('overlay').classList.add('hidden');
-            addTile(); addTile(); addTile();
-            render();
+    let board = [];
+    let currentPhase = 'placing';     
+    let currentPlayer = 'red';        
+    let firstPlayerBattle = 'blue';   
+    let selectedCell = null;         
+    let winner = null;               
+    let turnCount = 0;              
+    let placedRed = false;
+    let placedBlue = false;
+
+    const boardEl = document.getElementById('board');
+    const phaseDisplay = document.getElementById('phaseDisplay');
+    const statusMsg = document.getElementById('statusMsg');
+    const blueBadge = document.getElementById('blueBadge');
+    const redBadge = document.getElementById('redBadge');
+    
+    const pushForward = document.getElementById('pushForward');
+    const pushLeft = document.getElementById('pushLeft');
+    const pushRight = document.getElementById('pushRight');
+    const buffUpgrade = document.getElementById('buffUpgrade');
+    const buffDelete = document.getElementById('buffDelete');
+    const resetBtn = document.getElementById('resetGame');
+
+    // ---------- 方向映射 ----------
+    function getDirectionDeltas(player) {
+      if (player === 'red') {
+        return { forward: [-1, 0], left: [0, -1], right: [0, 1] };
+      } else {
+        return { forward: [1, 0], left: [0, 1], right: [0, -1] };
+      }
+    }
+
+    function isValidCell(r, c) {
+      return r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE;
+    }
+
+    function createEmptyBoard() {
+      return Array(BOARD_SIZE).fill().map(() => Array(BOARD_SIZE).fill().map(() => ({
+        player: null, value: 0, level: 0
+      })));
+    }
+
+    // 重置
+    function resetGame() {
+      board = createEmptyBoard();
+      currentPhase = 'placing';
+      currentPlayer = 'red';
+      placedRed = false;
+      placedBlue = false;
+      selectedCell = null;
+      winner = null;
+      turnCount = 0;
+      updateUI();
+      renderBoard();
+      setStatusMessage('🔴 红方先落子 (只能放在最下方两行)');
+    }
+
+    // 胜利检测
+    function checkVictory() {
+      for (let r=0; r<BOARD_SIZE; r++) {
+        for (let c=0; c<BOARD_SIZE; c++) {
+          const cell = board[r][c];
+          if (cell.player && cell.level >= WIN_LEVEL) return cell.player;
         }
-
-        // 添加方块
-        function addTile() {
-            let emptyCells = [];
-            for(let r=0; r<4; r++) 
-                for(let c=0; c<4; c++) 
-                    if(grid[r][c] === 0) emptyCells.push({r, c});
-            
-            if(emptyCells.length > 0) {
-                let {r, c} = emptyCells[Math.floor(Math.random() * emptyCells.length)];
-                // 检查是否有 Buff 强制生成的数字
-                grid[r][c] = nextTileForce || (Math.random() < 0.9 ? 4096 : 2048);
-                nextTileForce = null;
+      }
+      const dirs = [[0,1],[1,0]];
+      for (let r=0; r<BOARD_SIZE; r++) {
+        for (let c=0; c<BOARD_SIZE; c++) {
+          const cell = board[r][c];
+          if (!cell.player || cell.level < TOWER_LEVEL) continue;
+          const player = cell.player;
+          for (let [dr, dc] of dirs) {
+            let count = 1;
+            let nr = r + dr, nc = c + dc;
+            while (isValidCell(nr, nc) && board[nr][nc].player === player && board[nr][nc].level >= TOWER_LEVEL) {
+              count++;
+              nr += dr;
+              nc += dc;
             }
+            if (count >= 4) return player;
+          }
         }
+      }
+      if (currentPhase === 'battle' && turnCount >= 120) return 'draw';
+      return null;
+    }
 
-        // 渲染页面
-        function render() {
-            boardElement.innerHTML = '';
-            for (let r = 0; r < 4; r++) {
-                for (let c = 0; c < 4; c++) {
-                    const val = grid[r][c];
-                    const container = document.createElement('div');
-                    container.className = 'cell-base';
-                    const content = document.createElement('div');
-                    content.className = 'cell-content r-corner ' + (val > 0 ? 'bg-white tile' : 'grid-cell-empty');
-                    if(val > 0) {
-                        content.textContent = val;
-                        if(val === 1) content.classList.add('bg-blue-600', 'text-white', 'scale-110', 'shadow-blue-200');
-                        // 数字长度适配
-                        content.style.fontSize = val > 999 ? '0.8rem' : '1.2rem';
-                        content.style.fontWeight = 'bold';
-                    }
-                    container.appendChild(content);
-                    boardElement.appendChild(container);
-                }
-            }
-            document.getElementById('score').textContent = score;
+    function applyCarry(cell) {
+      let changed = false;
+      while (cell.value >= 10) {
+        cell.level += 1;
+        cell.value = 1;
+        changed = true;
+      }
+      return changed;
+    }
+
+    function afterMoveCheck() {
+      const victor = checkVictory();
+      if (victor) {
+        winner = victor;
+        currentPhase = 'gameover';
+        setStatusMessage(victor === 'draw' ? '🤝 平局！超过120回合' : `${victor === 'red' ? '🔴 红方' : '🔵 蓝方'} 达成胜利！`);
+        updateUI();
+        renderBoard();
+      }
+    }
+
+    // 核心推操作
+    function executePush(selectedRow, selectedCol, direction) {
+      if (currentPhase !== 'battle' || winner) return false;
+      const cell = board[selectedRow][selectedCol];
+      if (!cell.player || cell.player !== currentPlayer) {
+        setStatusMessage('只能推动自己的格子');
+        return false;
+      }
+      
+      const deltas = getDirectionDeltas(currentPlayer);
+      let delta;
+      if (direction === 'forward') delta = deltas.forward;
+      else if (direction === 'left') delta = deltas.left;
+      else if (direction === 'right') delta = deltas.right;
+      else return false;
+      
+      const nr = selectedRow + delta[0];
+      const nc = selectedCol + delta[1];
+      if (!isValidCell(nr, nc)) {
+        setStatusMessage('无法推向棋盘外');
+        return false;
+      }
+      
+      const targetCell = board[nr][nc];
+      const sourceCell = cell;
+      
+      if (targetCell.player === null) {
+        targetCell.player = currentPlayer;
+        targetCell.value = sourceCell.value + 1;
+        targetCell.level = sourceCell.level;
+        applyCarry(targetCell);
+      } else if (targetCell.player === currentPlayer) {
+        targetCell.value = sourceCell.value + 1;
+        applyCarry(targetCell);
+      } else {
+        // 敌方: 占领，数值层数不变
+        targetCell.player = currentPlayer;
+      }
+      
+      turnCount++;
+      currentPlayer = currentPlayer === 'red' ? 'blue' : 'red';
+      selectedCell = null;
+      
+      renderBoard();
+      const victor = checkVictory();
+      if (victor) {
+        winner = victor;
+        currentPhase = 'gameover';
+        setStatusMessage(victor === 'draw' ? '🤝 平局' : `${victor === 'red' ? '🔴 红方' : '🔵 蓝方'} 胜利！`);
+      } else {
+        setStatusMessage(`${currentPlayer === 'red' ? '🔴 红方' : '🔵 蓝方'} 的回合，点击己方格子选中`);
+      }
+      updateUI();
+      return true;
+    }
+
+    // 落子
+    function tryPlace(row, col) {
+      if (currentPhase !== 'placing' || winner) return false;
+      if (board[row][col].player !== null) {
+        setStatusMessage('这里已经有格子了');
+        return false;
+      }
+      
+      const isRedArea = (row === 4 || row === 5);
+      const isBlueArea = (row === 0 || row === 1);
+      
+      if (currentPlayer === 'red' && !isRedArea) {
+        setStatusMessage('红方只能放在最下方两行 (第5、6行)');
+        return false;
+      }
+      if (currentPlayer === 'blue' && !isBlueArea) {
+        setStatusMessage('蓝方只能放在最上方两行 (第1、2行)');
+        return false;
+      }
+      
+      board[row][col] = { player: currentPlayer, value: 1, level: 1 };
+      
+      if (currentPlayer === 'red') placedRed = true;
+      else placedBlue = true;
+      
+      if (placedRed && placedBlue) {
+        currentPhase = 'battle';
+        currentPlayer = firstPlayerBattle;
+        turnCount = 0;
+        setStatusMessage('⚔️ 对战开始！蓝方先推 · 点击蓝方格子选中');
+      } else {
+        currentPlayer = currentPlayer === 'red' ? 'blue' : 'red';
+        setStatusMessage(`${currentPlayer === 'red' ? '🔴 红方' : '🔵 蓝方'} 落子`);
+      }
+      
+      selectedCell = null;
+      renderBoard();
+      updateUI();
+      
+      if (currentPhase === 'battle') {
+        const v = checkVictory();
+        if (v) { winner = v; currentPhase = 'gameover'; updateUI(); }
+      }
+      return true;
+    }
+
+    // BUFF答题
+    function simpleMathQuiz(callback) {
+      const a = Math.floor(Math.random() * 5) + 1;
+      const b = Math.floor(Math.random() * 5) + 1;
+      const answer = a + b;
+      const userAnswer = prompt(`🧮 答题启用buff: ${a} + ${b} = ?`);
+      if (userAnswer !== null && parseInt(userAnswer, 10) === answer) {
+        callback(true);
+      } else {
+        alert('❌ 答案错误或取消');
+        callback(false);
+      }
+    }
+
+    function useBuffUpgrade() {
+      if (currentPhase !== 'battle' || winner) { alert('现在不能使用buff'); return; }
+      if (!selectedCell) { alert('请先选中一个你的格子'); return; }
+      const { row, col } = selectedCell;
+      const cell = board[row][col];
+      if (!cell.player || cell.player !== currentPlayer) { alert('只能对自己的格子使用升格'); return; }
+      
+      simpleMathQuiz((success) => {
+        if (!success) return;
+        cell.value += 1;
+        cell.level += 1;
+        applyCarry(cell);
+        renderBoard();
+        const victor = checkVictory();
+        if (victor) {
+          winner = victor;
+          currentPhase = 'gameover';
+          setStatusMessage(victor==='draw'?'平局':`${victor==='red'?'🔴红':'🔵蓝'}方胜利！`);
+        } else {
+          setStatusMessage(`升格成功`);
         }
+        updateUI();
+      });
+    }
 
-        // 核心滑动合并逻辑
-        function slide(row) {
-            let arr = row.filter(v => v !== 0);
-            for (let i = 0; i < arr.length - 1; i++) {
-                if (arr[i] === arr[i + 1]) {
-                    arr[i] /= 2; // 合并减半
-                    score += 10;
-                    arr[i + 1] = 0;
-                    if(arr[i] === 1) endGame(true);
-                }
-            }
-            arr = arr.filter(v => v !== 0);
-            while (arr.length < 4) arr.push(0);
-            return arr;
+    function useBuffDelete() {
+      if (currentPhase !== 'battle' || winner) { alert('现在不能使用'); return; }
+      if (!selectedCell) { alert('请选中一个敌方格子'); return; }
+      const { row, col } = selectedCell;
+      const cell = board[row][col];
+      if (!cell.player || cell.player === currentPlayer) { alert('必须选中敌方格子才能删除'); return; }
+      
+      simpleMathQuiz((success) => {
+        if (!success) return;
+        board[row][col] = { player: null, value: 0, level: 0 };
+        selectedCell = null;
+        renderBoard();
+        const victor = checkVictory();
+        if (victor) {
+          winner = victor;
+          currentPhase = 'gameover';
+          setStatusMessage(victor==='draw'?'平局':`${victor==='red'?'🔴红':'🔵蓝'}方胜利！`);
+        } else {
+          setStatusMessage(`敌方格被消除`);
         }
+        updateUI();
+      });
+    }
 
-        function rotateGrid(m) { return m[0].map((_, i) => m.map(row => row[i]).reverse()); }
-
-        function handleMove(dir) {
-            if(!document.getElementById('overlay').classList.contains('hidden')) return;
-            let temp = JSON.parse(JSON.stringify(grid));
-            let rots = { 'left': 0, 'down': 1, 'right': 2, 'up': 3 }[dir];
-            for(let i=0; i<rots; i++) temp = rotateGrid(temp);
-            for(let i=0; i<4; i++) temp[i] = slide(temp[i]);
-            for(let i=0; i<(4-rots)%4; i++) temp = rotateGrid(temp);
-            
-            if (JSON.stringify(grid) !== JSON.stringify(temp)) {
-                grid = temp; 
-                addTile(); 
-                render();
-                if (checkGameOver()) endGame(false);
-            }
+    // 渲染
+    function renderBoard() {
+      boardEl.innerHTML = '';
+      for (let r = 0; r < BOARD_SIZE; r++) {
+        for (let c = 0; c < BOARD_SIZE; c++) {
+          const cell = board[r][c];
+          const cellDiv = document.createElement('div');
+          cellDiv.className = 'cell';
+          if (cell.player === 'red') cellDiv.classList.add('red');
+          if (cell.player === 'blue') cellDiv.classList.add('blue');
+          if (cell.level >= WIN_LEVEL) cellDiv.classList.add('legendary');
+          else if (cell.level >= TOWER_LEVEL) cellDiv.classList.add('high-tower');
+          
+          if (selectedCell && selectedCell.row === r && selectedCell.col === c) {
+            cellDiv.classList.add('selected');
+          }
+          
+          const valueSpan = document.createElement('div');
+          valueSpan.className = 'value-large';
+          valueSpan.textContent = cell.player ? cell.value : '';
+          
+          const levelSpan = document.createElement('div');
+          levelSpan.className = 'level-indicator';
+          levelSpan.textContent = cell.player ? `Lv.${cell.level}` : '';
+          
+          cellDiv.appendChild(valueSpan);
+          cellDiv.appendChild(levelSpan);
+          
+          cellDiv.addEventListener('click', () => handleCellClick(r, c));
+          boardEl.appendChild(cellDiv);
         }
+      }
+    }
 
-        function checkGameOver() {
-            for (let r = 0; r < 4; r++) 
-                for (let c = 0; c < 4; c++) {
-                    if (grid[r][c] === 0) return false;
-                    if (c < 3 && grid[r][c] === grid[r][c+1]) return false;
-                    if (r < 3 && grid[r][c] === grid[r+1][c]) return false;
-                }
-            return true;
+    function handleCellClick(row, col) {
+      if (winner || currentPhase === 'gameover') {
+        setStatusMessage('游戏已结束，重开一局吧');
+        return;
+      }
+      
+      const cell = board[row][col];
+      
+      if (currentPhase === 'placing') {
+        tryPlace(row, col);
+        return;
+      }
+      
+      if (currentPhase === 'battle') {
+        // 点击逻辑：只能选中己方或敌方（用于buff），但推动必须选中己方
+        if (cell.player) {
+          selectedCell = { row, col };
+          if (cell.player === currentPlayer) {
+            setStatusMessage(`选中己方格 (${row+1},${col+1})，选择方向推动`);
+          } else {
+            setStatusMessage(`选中敌方格子，可使用删除buff`);
+          }
+        } else {
+          selectedCell = null;
+          setStatusMessage('点击格子选中 (己方格子才能推动)');
         }
+        renderBoard();
+        updateUI(); // 更新按钮状态
+      }
+    }
 
-        function endGame(win) {
-            const over = document.getElementById('overlay');
-            over.classList.remove('hidden');
-            document.getElementById('status-title').textContent = win ? "成功突破!" : "计算溢出!";
-            document.getElementById('status-title').className = "text-3xl font-bold mb-4 " + (win ? "text-blue-600" : "text-red-500");
-            document.getElementById('status-desc').textContent = win ? "你成功合成了数字 1。" : "棋盘已满，逻辑链路断开。";
-        }
+    function updateUI() {
+      blueBadge.classList.toggle('turn-active', currentPlayer === 'blue' && !winner && currentPhase !== 'gameover');
+      redBadge.classList.toggle('turn-active', currentPlayer === 'red' && !winner && currentPhase !== 'gameover');
+      
+      if (currentPhase === 'placing') phaseDisplay.textContent = '🏁 落子阶段';
+      else if (currentPhase === 'battle') phaseDisplay.textContent = `⚡ 对战 · 回合 ${turnCount}`;
+      else if (currentPhase === 'gameover') phaseDisplay.textContent = winner==='draw'?'🤝 平局':`🏆 ${winner==='red'?'红':'蓝'}方胜利`;
+      
+      const battleActive = (currentPhase === 'battle' && !winner);
+      // 方向按钮：只有选中己方格子时才启用
+      const canPush = battleActive && selectedCell && board[selectedCell.row][selectedCell.col].player === currentPlayer;
+      pushForward.disabled = !canPush;
+      pushLeft.disabled = !canPush;
+      pushRight.disabled = !canPush;
+      
+      buffUpgrade.disabled = !battleActive;
+      buffDelete.disabled = !battleActive;
+    }
 
-        // --- 数学补给系统 ---
-        function showMathQuiz(type) {
-            currentQuiz.type = type;
-            const q = document.getElementById('quiz-question');
-            const input = document.getElementById('quiz-input');
-            
-            // 修复点：清空上次输入的文本
-            input.value = '';
+    function setStatusMessage(msg) {
+      statusMsg.textContent = msg;
+    }
 
-            if(type === 'easy') {
-                let a = Math.floor(Math.random()*9)+2, b = Math.floor(Math.random()*9)+2;
-                q.innerHTML = `${a} &times; ${b} = ?`;
-                currentQuiz.answer = a*b;
-                document.getElementById('quiz-tag').innerText = "补给：下一球必为 2048";
-            } else {
-                let x = Math.floor(Math.random()*4)+1, y = Math.floor(Math.random()*4)+1;
-                q.innerHTML = `若 x=${x}, y=${y} <br>x² + y² = ?`;
-                currentQuiz.answer = x*x + y*y;
-                document.getElementById('quiz-tag').innerText = "坍缩：随机消灭一个 4096";
-            }
-            document.getElementById('quiz-overlay').classList.remove('hidden');
-            setTimeout(() => input.focus(), 100);
-        }
+    // 绑定事件
+    pushForward.addEventListener('click', () => {
+      if (!selectedCell) return;
+      executePush(selectedCell.row, selectedCell.col, 'forward');
+    });
+    pushLeft.addEventListener('click', () => {
+      if (!selectedCell) return;
+      executePush(selectedCell.row, selectedCell.col, 'left');
+    });
+    pushRight.addEventListener('click', () => {
+      if (!selectedCell) return;
+      executePush(selectedCell.row, selectedCell.col, 'right');
+    });
+    
+    buffUpgrade.addEventListener('click', useBuffUpgrade);
+    buffDelete.addEventListener('click', useBuffDelete);
+    resetBtn.addEventListener('click', resetGame);
 
-        function checkQuizAnswer() {
-            const userInput = document.getElementById('quiz-input').value;
-            if(parseInt(userInput) === currentQuiz.answer) {
-                if(currentQuiz.type === 'easy') {
-                    nextTileForce = 2048; 
-                    alert("干预成功：下一个出现的方块必为 2048！");
-                } else {
-                    let done = false;
-                    for(let r=0; r<4; r++) for(let c=0; c<4; c++) 
-                        if(grid[r][c] === 4096) { grid[r][c] = 0; done = true; break; }
-                    alert(done ? "干预成功：检测到最大数值已被抹除！" : "干预无效：场上没有 4096");
-                    render();
-                }
-            } else { alert("计算偏差，干预失败！"); }
-            closeQuiz();
-        }
-        function closeQuiz() { document.getElementById('quiz-overlay').classList.add('hidden'); }
-
-        // --- 触屏与键盘控制 ---
-        let tsX, tsY;
-        window.addEventListener('touchstart', e => { 
-            tsX = e.touches[0].clientX; 
-            tsY = e.touches[0].clientY; 
-        }, { passive: true });
-
-        window.addEventListener('touchend', e => {
-            let dx = e.changedTouches[0].clientX - tsX;
-            let dy = e.changedTouches[0].clientY - tsY;
-            if(Math.max(Math.abs(dx), Math.abs(dy)) < 30) return;
-            if(Math.abs(dx) > Math.abs(dy)) handleMove(dx > 0 ? 'right' : 'left');
-            else handleMove(dy > 0 ? 'down' : 'up');
-        }, { passive: true });
-
-        window.addEventListener('keydown', e => {
-            if(e.key.includes('Arrow')) handleMove(e.key.replace('Arrow','').toLowerCase());
-        });
-
-        initGame();
-    </script>
+    resetGame();
+  })();
+</script>
 </body>
 </html>
